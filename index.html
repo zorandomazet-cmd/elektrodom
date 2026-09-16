@@ -154,68 +154,113 @@ function isNo(t){return /^(ne|ne hvala|ne potrebujem)$/i.test(t.trim())}
 function isAdd(t){return /\b(dodaj|dodajte|dodam|vzamem|vzemi|izberem|izberi)\b/i.test(t)}
 function isInstall(t){return /(montaž|namestit|zmontir|montirat)/i.test(t)}
 
+function recommendedProducts(){
+  return PRODUCTS.filter(p=>p.category==="Svetila" && !(state.space==="kopalnica"&&p.tags.includes("zunanja")) && (!state.budget||p.price<=state.budget));
+}
+function getSelectedProduct(){
+  if(lastSelectedProductId){const p=PRODUCTS.find(x=>x.id===lastSelectedProductId);if(p)return p;}
+  return recommendedProducts()[0]||null;
+}
+function addRememberedProduct(){
+  const p=getSelectedProduct();if(!p)return null;
+  lastSelectedProductId=p.id;
+  if(!cart.some(x=>x.id===p.id))cart.push(p);
+  $("cartCount").textContent=cart.length;updateState();return p;
+}
+function isYes(t){return /^(ja|da|lahko|seveda|ok|okej|potrjujem|potrdi)$/i.test(t.trim())}
+function isNo(t){return /^(ne|ne hvala|ne potrebujem)$/i.test(t.trim())}
+function isAdd(t){return /\b(dodaj|dodajte|dodam|vzamem|vzemi|izberem|izberi)\b/i.test(t)}
+function isInstall(t){return /(montaž|namestit|zmontir|montirat)/i.test(t)}
+
 function reply(raw){
- const t=raw.toLowerCase().trim(); setFacts(t);
+  const t=raw.toLowerCase().trim();setFacts(t);
 
- /* Recommendation state: first/second and natural add commands. */
- if(state.step==="offer"){
-   const ps=recommendedProducts();
-   if(/^(prvo|prvi|1)$/i.test(t) && ps[0]){
-     lastSelectedProductId=ps[0].id; addRememberedProduct(); state.step="installation";
-     return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
-   }
-   if(/^(drugo|drugi|2)$/i.test(t) && ps[1]){
-     lastSelectedProductId=ps[1].id; addRememberedProduct(); state.step="installation";
-     return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
-   }
-   if(isAdd(t)||isYes(t)){
-     const p=addRememberedProduct();
-     if(p){state.step="installation";return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;}
-   }
- }
+  /* Location has priority once the bot is waiting for a service location. */
+  if(state.step==="service"){
+    state.intent="električar";
+    if(!state.location){
+      const loc=t.replace(/^(v|iz)\s+/i,"").trim();
+      if(loc){
+        state.location=loc.charAt(0).toUpperCase()+loc.slice(1);
+        state.step="lead";
+        const p=getSelectedProduct();
+        return `Super, zabeležil sem lokacijo <b>${state.location}</b>.${p&&cart.length?` V košarici je <b>${p.name}</b> za ${eur(p.price)}.`:""}<br><br>Želite, da pripravimo <b>testno povpraševanje za montažo</b>?`;
+      }
+    }
+  }
 
- /* Installation state. */
- if(state.step==="installation"){
-   if(isInstall(t)||isYes(t)){
-     state.service="montaža svetila"; state.intent="električar"; state.step="service";
-     return "Seveda. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?";
-   }
-   if(isNo(t)){state.step="cart";return "Seveda. Izdelek ostane v košarici.";}
- }
+  /* Lead confirmation. */
+  if(state.step==="lead"){
+    if(isYes(t))return buildLeadSummary();
+    if(isNo(t)){state.step="completed";return "V redu. Povpraševanja ne bom oddal.";}
+  }
 
- /* Compound command must do both: add remembered product + installation. */
- if(isInstall(t) && (isAdd(t)||/\b(jo|ga|to)\b/i.test(t))){
-   const p=addRememberedProduct();
-   if(p){
-     state.service="montaža svetila";state.intent="električar";state.step="service";
-     return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
-   }
- }
+  /* Product recommendation state. */
+  if(state.step==="offer"){
+    const ps=recommendedProducts();
+    if(/^(prvo|prvi|1)$/i.test(t)&&ps[0]){
+      lastSelectedProductId=ps[0].id;addRememberedProduct();state.step="installation";
+      return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+    }
+    if(/^(drugo|drugi|2)$/i.test(t)&&ps[1]){
+      lastSelectedProductId=ps[1].id;addRememberedProduct();state.step="installation";
+      return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+    }
+    if(isAdd(t)||isYes(t)){
+      const p=addRememberedProduct();
+      if(p){state.step="installation";return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;}
+    }
+  }
 
- let d=detectIntent(t); if(d)state.intent=d;
+  /* Installation. */
+  if(state.step==="installation"){
+    if(isInstall(t)||isYes(t)){
+      state.service="montaža svetila";state.intent="električar";state.step="service";
+      return "Seveda. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?";
+    }
+    if(isNo(t)){state.step="cart";return "Seveda. Izdelek ostane v košarici.";}
+  }
 
- if(/^(stropno|stropna|stropen)$/i.test(t)){
-   state.mounting="stropno";state.step="budget";
-   return `Odlično, iščemo <b>stropno svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
- }
- if(/^(stensko|stenska)$/i.test(t)){
-   state.mounting="stensko";state.step="budget";
-   return `Odlično, iščemo <b>stensko svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
- }
+  /* Compound add + installation. */
+  if(isInstall(t)&&(isAdd(t)||/\b(jo|ga|to)\b/i.test(t))){
+    const p=addRememberedProduct();
+    if(p){
+      state.service="montaža svetila";state.intent="električar";state.step="service";
+      return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
+    }
+  }
 
- if(state.intent==="svetilo"){
-   if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`;}
-   if(state.mounting&&!state.budget){state.step="budget";return `Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;}
-   if(state.budget){state.step="offer";recommendations();return `Glede na vaše zahteve sem izbor omejil na izdelke do <b>${eur(state.budget)}</b>. Poglejte predloge spodaj. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;}
- }
- if(state.intent==="električar"){
-   state.step="service";
-   if(!state.location)return "Razumem. Potrebujete električarja. V katerem <b>kraju</b> je storitev?";
- }
- if(state.intent==="napaka")return "Pri električni napaki je varnost na prvem mestu. Opišite, <b>kaj ne deluje in kje</b>, nato lahko pripravimo povpraševanje za električarja.";
- if(state.intent==="vtičnice/stikala")return "Koliko vtičnic ali stikal potrebujete in ali gre za <b>menjavo ali novo montažo</b>?";
- if(state.intent==="prenova")return "Za začetni seznam potrebujem približno <b>površino, število prostorov</b> in informacijo, ali gre za novo ali delno napeljavo.";
- return "Razumem. Povejte mi, ali potrebujete <b>material, električarja ali oboje</b>.";
+  let d=detectIntent(t);if(d)state.intent=d;
+
+  if(/^(stropno|stropna|stropen)$/i.test(t)){
+    state.mounting="stropno";state.step="budget";
+    return `Odlično, iščemo <b>stropno svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
+  }
+  if(/^(stensko|stenska)$/i.test(t)){
+    state.mounting="stensko";state.step="budget";
+    return `Odlično, iščemo <b>stensko svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
+  }
+
+  if(state.intent==="svetilo"){
+    if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`;}
+    if(state.mounting&&!state.budget){state.step="budget";return `Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;}
+    if(state.budget){state.step="offer";recommendations();return `Glede na vaše zahteve sem izbor omejil na izdelke do <b>${eur(state.budget)}</b>. Poglejte predloge spodaj. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;}
+  }
+
+  if(state.intent==="električar"){
+    state.step="service";
+    return "Razumem. Potrebujete električarja. V katerem <b>kraju</b> je storitev?";
+  }
+  if(state.intent==="napaka")return "Pri električni napaki je varnost na prvem mestu. Opišite, <b>kaj ne deluje in kje</b>, nato lahko pripravimo povpraševanje za električarja.";
+  if(state.intent==="vtičnice/stikala")return "Koliko vtičnic ali stikal potrebujete in ali gre za <b>menjavo ali novo montažo</b>?";
+  if(state.intent==="prenova")return "Za začetni seznam potrebujem približno <b>površino, število prostorov</b> in informacijo, ali gre za novo ali delno napeljavo.";
+  return "Razumem. Povejte mi, ali potrebujete <b>material, električarja ali oboje</b>.";
+}
+
+function buildLeadSummary(){
+  const total=cart.reduce((s,p)=>s+p.price,0);
+  state.step="completed";
+  return `<b>Testno povpraševanje</b><br><br>${cart.length?cart.map(p=>`• ${p.name} — ${eur(p.price)}`).join("<br>")+"<br>":""}${state.service?`• Storitev: ${state.service}<br>`:""}${state.location?`• Lokacija: ${state.location}<br>`:""}${cart.length?`<br>Izdelki skupaj: <b>${eur(total)}</b><br>`:""}<br>To je testni prototip — v naslednji fazi lahko podatke pošljemo v pravi lead/CRM sistem.`;
 }
 
 $("chatForm").addEventListener("submit",e=>{e.preventDefault();let i=$("chatInput"),t=i.value.trim();if(!t)return;addMessage(t,"user");i.value="";setTimeout(()=>{addMessage(reply(t),"bot");updateState()},180)});
