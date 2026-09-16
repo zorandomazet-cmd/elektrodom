@@ -74,13 +74,14 @@ const PRODUCTS=[
 ];
 
 let cart=[];
+let lastSelectedProductId=null;
 let state={intent:null,space:null,area:null,mounting:null,budget:null,count:null,location:null,step:"intent",service:null};
 const $=id=>document.getElementById(id);
 const eur=n=>n.toLocaleString("sl-SI",{style:"currency",currency:"EUR"});
 function addMessage(t,type){const d=document.createElement("div");d.className="msg "+type;d.innerHTML=t;$("chatMessages").appendChild(d);$("chatMessages").scrollTop=$("chatMessages").scrollHeight}
 function openAssistant(){document.querySelector("#assistant").scrollIntoView({behavior:"smooth"});setTimeout(()=>$("chatInput").focus(),300)}
 function quickAsk(t){$("chatInput").value=t;$("chatForm").requestSubmit()}
-function resetChat(){state={intent:null,space:null,area:null,mounting:null,budget:null,count:null,location:null,step:"intent",service:null};$("chatMessages").innerHTML="";$("recommendations").innerHTML="";addMessage("Pozdravljeni! Kaj potrebujete – <b>elektro material, električarja ali oboje</b>?","bot");updateState()}
+function resetChat(){lastSelectedProductId=null;cart=[];$("cartCount").textContent=0;state={intent:null,space:null,area:null,mounting:null,budget:null,count:null,location:null,step:"intent",service:null};$("chatMessages").innerHTML="";$("recommendations").innerHTML="";addMessage("Pozdravljeni! Kaj potrebujete – <b>elektro material, električarja ali oboje</b>?","bot");updateState()}
 function updateState(){let s=[];if(state.intent)s.push("potreba: "+state.intent);if(state.space)s.push("prostor: "+state.space);if(state.area)s.push("površina: "+state.area+" m²");if(state.mounting)s.push("montaža: "+state.mounting);if(state.budget)s.push("proračun: "+state.budget+" €");if(state.count)s.push("količina: "+state.count);if(state.location)s.push("kraj: "+state.location);$("state").innerHTML="<b>Kontekst:</b> "+(s.join(" • ")||"še ni podatkov");$("funnel").innerHTML="<b>Funnel:</b> "+(state.intent||"začetek")+" → "+(state.step||"intent")+" → košarica "+cart.length}
 function moneyValue(t){
  let m=t.match(/(?:do|pod|max(?:imalno)?|največ)\s*(\d+(?:[.,]\d+)?)\s*€?/i);
@@ -125,23 +126,57 @@ function recommendations(){
  $("recommendations").innerHTML=ps.length?'<div class="rec-title">Predlogi iz testnega kataloga</div>'+ps.map((p,i)=>`<div class="rec"><span>${p.icon}</span><div><b>${i+1}. ${p.name}</b><small>${p.desc}</small><strong>${eur(p.price)}</strong></div><button onclick="addToCart(${p.id})">Dodaj</button></div>`).join(""):"";
 }
 function cartSummary(){return cart.length?cart.map(p=>`${p.name} — ${eur(p.price)}`).join("<br>")+"<br><b>Skupaj: "+eur(cart.reduce((s,p)=>s+p.price,0))+"</b>":"Košarica je prazna."}
+function selectedProduct(){
+ if(lastSelectedProductId)return PRODUCTS.find(p=>p.id===lastSelectedProductId);
+ const ps=PRODUCTS.filter(p=>p.category==="Svetila"&&(!state.budget||p.price<=state.budget));
+ return ps[0]||null;
+}
+function ensureSelectedInCart(){
+ const p=selectedProduct(); if(!p)return null;
+ if(!cart.some(x=>x.id===p.id)) addToCart(p.id);
+ return p;
+}
 function reply(raw){
  let t=raw.toLowerCase().trim(); setFacts(t);
  let d=detectIntent(t); if(d && d!=="električar") state.intent=d;
+
+ // Compound command: "dodajte jo + montaža" must add the remembered product immediately.
+ const wantsInstall=/(montaž|namestit|zmontir)/i.test(t);
+ const refersToLast=/(dodaj|dodajte|vzem|vzamem|izberem|izbral|jo|ga|to|prvo|prvi|1)/i.test(t);
+ if(wantsInstall && refersToLast){
+   const p=ensureSelectedInCart();
+   if(p){
+     state.service="montaža svetila"; state.intent="električar"; state.step="service";
+     updateState();
+     if(!state.location) return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
+     return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je v košarici. Za montažo v <b>${state.location}</b> lahko pripravimo testno povpraševanje.`;
+   }
+ }
+
  if(/^(stropno|stropna|stropen)$/i.test(t)){state.mounting="stropno";state.step="budget"}
  if(/^(stensko|stenska)$/i.test(t)){state.mounting="stensko";state.step="budget"}
+
  if(/^(prvo|prvi|1)$/i.test(t)){
    const ps=PRODUCTS.filter(p=>p.category==="Svetila"&&!(state.space==="kopalnica"&&p.tags.includes("zunanja"))&&(!state.budget||p.price<=state.budget));
-   if(ps[0]){state.step="offer";return `Izbrali ste <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b>. Kliknite <b>Dodaj</b>, če ga še niste dodali. Če želite, lahko uredimo tudi <b>montažo</b>.`;}
+   if(ps[0]){
+     lastSelectedProductId=ps[0].id; state.step="offer";
+     return `Izbrali ste <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b>. Ali želite, da ga dodam v košarico? Če želite, lahko uredimo tudi <b>montažo</b>.`;
+   }
  }
  if(/^(drugo|drugi|2)$/i.test(t)){
    const ps=PRODUCTS.filter(p=>p.category==="Svetila"&&!(state.space==="kopalnica"&&p.tags.includes("zunanja"))&&(!state.budget||p.price<=state.budget));
-   if(ps[1]){state.step="offer";return `Izbrali ste <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b>. Kliknite <b>Dodaj</b>, če ga še niste dodali. Če želite, lahko uredimo tudi <b>montažo</b>.`;}
+   if(ps[1]){
+     lastSelectedProductId=ps[1].id; state.step="offer";
+     return `Izbrali ste <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b>. Ali želite, da ga dodam v košarico?`;
+   }
  }
- if(/(tudi|še|potrebujem).*(montaž|namestit)|montaž.*(tudi|še)/i.test(t)){
+ if(/^(ja|da|lahko|seveda)$/i.test(t) && state.step==="offer"){
+   const p=ensureSelectedInCart(); state.step="installation";
+   return p?`Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`:"Izbira ni več na voljo.";
+ }
+ if(wantsInstall && !refersToLast){
    state.service="montaža svetila";state.intent="električar";state.step="service";
-   if(!state.location)return `Seveda. ${cart.length?"Izdelek ostaja v vaši košarici. ":""}Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
-   return `Seveda. ${cart.length?"Izdelek ostaja v vaši košarici. ":""}Montaža v <b>${state.location}</b> je pripravljena za testno povpraševanje.`;
+   if(!state.location)return "Seveda. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?";
  }
  if(state.intent==="svetilo"){
    if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`}
@@ -161,7 +196,7 @@ function reply(raw){
 }
 $("chatForm").addEventListener("submit",e=>{e.preventDefault();let i=$("chatInput"),t=i.value.trim();if(!t)return;addMessage(t,"user");i.value="";setTimeout(()=>{addMessage(reply(t),"bot");updateState()},180)});
 function render(filter=""){let q=filter.toLowerCase(),ps=PRODUCTS.filter(p=>(p.name+" "+p.category+" "+p.desc+" "+p.tags.join(" ")).toLowerCase().includes(q));$("productGrid").innerHTML=ps.map(p=>`<article><div class="pic">${p.icon}</div><small>${p.category}</small><h3>${p.name}</h3><p>${p.desc}</p><b class="price">${eur(p.price)}</b><button onclick="addToCart(${p.id})">Dodaj v košarico</button></article>`).join("")}
-function addToCart(id){let p=PRODUCTS.find(x=>x.id===id);cart.push(p);$("cartCount").textContent=cart.length;updateState();toast(p.name+" je dodan v košarico.")}
+function addToCart(id){let p=PRODUCTS.find(x=>x.id===id);if(!p)return;lastSelectedProductId=id;if(!cart.some(x=>x.id===id))cart.push(p);$("cartCount").textContent=cart.length;updateState();toast(p.name+" je dodan v košarico.")}
 function openCart(){$("cartModal").classList.remove("hidden");$("cartItems").innerHTML=cart.length?cart.map(p=>`<div class="row"><span>${p.name}</span><b>${eur(p.price)}</b></div>`).join(""):"<p>Košarica je prazna.</p>";$("cartTotal").textContent=eur(cart.reduce((s,p)=>s+p.price,0))}
 function closeCart(){$("cartModal").classList.add("hidden")}function checkoutTest(){closeCart();toast("TEST: checkout bomo dodali v naslednji fazi.")}function toast(t){let e=$("toast");e.textContent=t;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),2200)}
 function startService(s){$("serviceSelect").value=s;document.querySelector("#quote").scrollIntoView({behavior:"smooth"});$("description").focus()}
