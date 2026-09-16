@@ -1,7 +1,21 @@
-# ElektroDom V2
+ElektroDom V5.1
+Popravek kombiniranega naravnega jezika.
 
-Testni prototip za AI prodajni/servisni bot.
+Test:
+"Rabim luč za kopalnico 8 m², stropno, do 50 €, pa montažo v Celju."
 
-Naloži vse datoteke v GitHub repository `elektrodom`, pri čemer mora biti `index.html` v korenu. Cloudflare Pages bo nato ob novem commitu objavil novo verzijo.
+Expected:
+- kopalnica
+- 8 m²
+- stropno
+- budget 50 €
+- montaža
+- Celje
+- priporočila brez ponovnega vprašanja po kraju
 
-V2 deluje brez zunanjega AI API-ja in vsebuje pogovorni state, priporočila izdelkov, košarico ter testni lead obrazec. Vsi podatki/cene so demonstracijski.
+Then:
+"prvo"
+Expected:
+- LED plafonjera 24 W added to cart
+- installation and Celje retained
+- asks for confirmation of test inquiry, not installation again

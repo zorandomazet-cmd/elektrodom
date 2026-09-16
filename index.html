@@ -208,7 +208,8 @@ function extractNaturalRequest(raw){
   ];
   for(const r of locPatterns){const m=t.match(r);if(m){state.location=normalizeLocation(m[1]);break;}}
 
-  if(state.service)state.intent="električar";
+  if(state.service && state.space)state.intent="svetilo";
+  else if(state.service)state.intent="električar";
   return state;
 }
 function reply(raw){
@@ -221,7 +222,8 @@ function reply(raw){
       state.step="offer";
       recommendations();
       let extra=state.service?`<br>Dodana je tudi zahteva za <b>${state.service}</b>.`:"";
-      return `Razumem: <b>${state.space||"prostor"}</b>${state.area?" • "+state.area+" m²":""}, <b>${state.mounting}</b>, proračun do <b>${eur(state.budget)}</b>.${state.location?` Lokacija: <b>${state.location}</b>.`:""}${extra}<br><br>Predlagam naslednje izdelke. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;
+      let place=state.location?` Lokacija: <b>${state.location}</b>.`:"";
+      return `Razumem: <b>${state.space||"prostor"}</b>${state.area?" • "+state.area+" m²":""}, <b>${state.mounting}</b>, proračun do <b>${eur(state.budget)}</b>.${place}${extra}<br><br>Predlagam naslednje izdelke. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;
     }
     if(state.space==="kopalnica" && !state.mounting){
       state.step="mounting";
@@ -257,11 +259,15 @@ function reply(raw){
   if(state.step==="offer"){
     const ps=recommendedProducts();
     if(/^(prvo|prvi|1)$/i.test(t)&&ps[0]){
-      lastSelectedProductId=ps[0].id;addRememberedProduct();state.step="installation";
+      lastSelectedProductId=ps[0].id;addRememberedProduct();
+      if(state.service && state.location){state.step="lead";return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>. Želite, da pripravimo <b>testno povpraševanje</b>?`;}
+      state.step="installation";
       return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
     }
     if(/^(drugo|drugi|2)$/i.test(t)&&ps[1]){
-      lastSelectedProductId=ps[1].id;addRememberedProduct();state.step="installation";
+      lastSelectedProductId=ps[1].id;addRememberedProduct();
+      if(state.service && state.location){state.step="lead";return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>. Želite, da pripravimo <b>testno povpraševanje</b>?`;}
+      state.step="installation";
       return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
     }
     if(isAdd(t)||isYes(t)){
