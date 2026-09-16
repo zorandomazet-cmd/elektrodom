@@ -43,6 +43,12 @@ button,input,textarea,select{font:inherit}.btn,button{border:0;border-radius:9px
 
 <section class="section gray" id="quote"><div class="wrap quote"><div><div class="eyebrow">LEAD / QUOTE TEST</div><h2>Priprava povpraševanja</h2><p>Testni obrazec za zaključek prodajnega/servisnega toka.</p><div id="leadPreview" class="preview"><b>Lead</b><p>Storitev → lokacija → potrebe → nujnost → kontakt.</p></div></div>
 <form id="quoteForm"><label>Storitev<select id="serviceSelect"><option>Montaža svetil</option><option>Vtičnice in stikala</option><option>Diagnostika napake</option><option>Elektroinštalacije</option><option>Drugo</option></select></label><label>Kraj<input id="city" required placeholder="npr. Celje"></label><label>Telefon<input id="phone" required placeholder="+386 ..."></label><label>E-pošta<input id="email" type="email" placeholder="ime@primer.si"></label><label>Opišite problem<textarea id="description" required rows="4"></textarea></label><button class="btn">Ustvari testno povpraševanje</button><div id="quoteResult"></div></form></div></section>
+
+<section class="section" id="tests"><div class="wrap">
+<div class="eyebrow">QA</div><h2>V3.1 preverjanje</h2>
+<div class="notice" id="qaResult">Testi se izvajajo …</div>
+</div></section>
+
 <section class="section" id="contact"><div class="wrap"><div class="eyebrow">TESTNO PODJETJE</div><h2>ElektroDom</h2><p>Testna stran za razvoj prodajnega, servisnega in lead-generation bota.</p><p class="notice">⚠️ Vsi izdelki, cene in storitve so demonstracijski. V3 ne izvaja dejanskih plačil in podatkov ne pošilja na strežnik.</p></div></section>
 </main>
 <div id="toast"></div><div id="cartModal" class="modal hidden"><div class="modal-card"><button class="close" onclick="closeCart()">×</button><h2>Košarica</h2><div id="cartItems"></div><p class="total">Skupaj: <b id="cartTotal">0,00 €</b></p><button class="btn" style="width:100%" onclick="checkoutTest()">Nadaljuj (test)</button></div></div>
@@ -76,15 +82,28 @@ function openAssistant(){document.querySelector("#assistant").scrollIntoView({be
 function quickAsk(t){$("chatInput").value=t;$("chatForm").requestSubmit()}
 function resetChat(){state={intent:null,space:null,area:null,mounting:null,budget:null,count:null,location:null,step:"intent",service:null};$("chatMessages").innerHTML="";$("recommendations").innerHTML="";addMessage("Pozdravljeni! Kaj potrebujete – <b>elektro material, električarja ali oboje</b>?","bot");updateState()}
 function updateState(){let s=[];if(state.intent)s.push("potreba: "+state.intent);if(state.space)s.push("prostor: "+state.space);if(state.area)s.push("površina: "+state.area+" m²");if(state.mounting)s.push("montaža: "+state.mounting);if(state.budget)s.push("proračun: "+state.budget+" €");if(state.count)s.push("količina: "+state.count);if(state.location)s.push("kraj: "+state.location);$("state").innerHTML="<b>Kontekst:</b> "+(s.join(" • ")||"še ni podatkov")}
-function moneyValue(t){let m=t.match(/(?:do|pod|max(?:imalno)?|največ)\s*(\d+(?:[.,]\d+)?)\s*€?/i);return m?parseFloat(m[1].replace(",",".")):null}
-function numberValue(t){let m=t.match(/(?:^|\\s)(\\d+)\\s*(?:kosov|kos|kom|svetilk|luči|vtičnic|stikal)?\\b/i);return m?parseInt(m[1]):null}
-function areaValue(t){let m=t.match(/(\\d+(?:[.,]\\d+)?)\\s*(?:m2|m²|kvadratov|kvadratnih\\s*metrov)/i);return m?parseFloat(m[1].replace(",",".")):null}
-
+function moneyValue(t){
+ let m=t.match(/(?:do|pod|max(?:imalno)?|največ)\s*(\d+(?:[.,]\d+)?)\s*€?/i);
+ return m?parseFloat(m[1].replace(",",".")):null;
+}
+function numberValue(t){
+ let m=t.match(/(?:^|\s)(\d+)\s*(?:kosov|kos|kom|svetilk|luči|vtičnic|stikal)\b/i);
+ return m?parseInt(m[1],10):null;
+}
+function areaValue(t){
+ let m=t.match(/(\d+(?:[.,]\d+)?)\s*(?:m²|m2|m\s*2|kvadrat(?:nih)?(?:\s+metrov)?)/i);
+ return m?parseFloat(m[1].replace(",",".")):null;
+}
 function setFacts(t){
+
  let a=areaValue(t);if(a)state.area=a;
  let b=moneyValue(t);if(b)state.budget=b;
  let n=numberValue(t);if(n && /svetilk|luči|vtičnic|stikal|kos|kom/i.test(t))state.count=n;
- if(/kopalnic/i.test(t))state.space="kopalnica";else if(/kuhinj/i.test(t))state.space="kuhinja";else if(/dnevni/i.test(t))state.space="dnevna soba";else if(/spalnic/i.test(t))state.space="spalnica";else if(/hodnik/i.test(t))state.space="hodnik";
+ if(/kopalnic/i.test(t))state.space="kopalnica";
+else if(/kuhinj/i.test(t))state.space="kuhinja";
+else if(/dnevni/i.test(t))state.space="dnevna soba";
+else if(/spalnic/i.test(t))state.space="spalnica";
+else if(/hodnik/i.test(t))state.space="hodnik";
  if(/stropn/i.test(t))state.mounting="stropno";if(/stens/i.test(t))state.mounting="stensko";
  if(/celj|celje/i.test(t))state.location="Celje";else if(/maribor/i.test(t))state.location="Maribor";else if(/ljubljan/i.test(t))state.location="Ljubljana";
 }
@@ -114,7 +133,7 @@ function reply(raw){
  if(/^(prvo|prvi|1)$/i.test(t)){return"Odlično — izbrali ste <b>prvo priporočilo</b>. Kliknite <b>Dodaj</b>, da ga dodate v košarico. Če želite, lahko nato uredimo tudi montažo."}
  if(/^(drugo|drugi|2)$/i.test(t)){return"Odlično — izbrali ste <b>drugo priporočilo</b>. Kliknite <b>Dodaj</b>, da ga dodate v košarico."}
  if(state.intent==="svetilo"){
-   if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return`Razumem — <b>kopalnica, ${state.area?state.area+" m²":"površina še ni znana"}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`}
+   if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return`Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`}
    if(state.mounting&&!state.budget){state.step="budget";return`Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`}
    if(state.budget){state.step="offer";recommendations();return`Glede na vaše zahteve sem izbor omejil na izdelke do <b>${eur(state.budget)}</b>. Poglejte predloge spodaj. <br><br>Če želite, lahko napišete <b>»prvo«</b> ali <b>»drugo«</b>, da nadaljujemo.`}
    recommendations();return"Za izbiro svetila potrebujem prostor, približno površino in mesto namestitve.";
@@ -133,5 +152,18 @@ function closeCart(){$("cartModal").classList.add("hidden")}function checkoutTes
 function startService(s){$("serviceSelect").value=s;document.querySelector("#quote").scrollIntoView({behavior:"smooth"});$("description").focus()}
 $("productSearch").addEventListener("input",e=>render(e.target.value));$("cartButton").addEventListener("click",openCart);
 $("quoteForm").addEventListener("submit",e=>{e.preventDefault();let s=$("serviceSelect").value,c=$("city").value,p=$("phone").value,em=$("email").value,d=$("description").value,u=/nujno|takoj|danes|ne dela|iskra|dim|vonj po zažgan/i.test(d);$("quoteResult").style.display="block";$("quoteResult").innerHTML=`<b>TESTNI LEAD</b><br>Storitev: ${s}<br>Kraj: ${c}<br>Nujnost: <b>${u?"VISOKA":"OBIČAJNA"}</b><br>Telefon: ${p}<br>E-pošta: ${em||"ni podana"}<br><br><small>V3: podatki ostanejo samo v brskalniku.</small>`;$("leadPreview").innerHTML=`<b>Lead pripravljen</b><p>${s} • ${c} • ${u?"VISOKA":"OBIČAJNA"} nujnost</p>`});
-resetChat();render();
+
+function runQATests(){
+ const cases=[
+  ["Površina: 8 m²", areaValue("Potrebujem luč za kopalnico, prostor ima 8 m²"),8],
+  ["Površina: 8m2", areaValue("kopalnica 8m2"),8],
+  ["Površina: 12,5 m²", areaValue("prostor ima 12,5 m²"),12.5],
+  ["Proračun: 50 €", moneyValue("do 50 €"),50],
+  ["Količina: 3 vtičnice", numberValue("3 vtičnice"),3]
+ ];
+ let passed=0, rows=cases.map(c=>{let ok=c[1]===c[2];if(ok)passed++;return `${ok?"✅":"❌"} ${c[0]} → ${c[1]}`});
+ $("qaResult").innerHTML=`<b>QA: ${passed}/${cases.length} testov uspešnih</b><br>${rows.join("<br>")}`;
+}
+
+resetChat();render();runQATests();
 </script></body></html>
