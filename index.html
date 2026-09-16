@@ -172,8 +172,66 @@ function isNo(t){return /^(ne|ne hvala|ne potrebujem)$/i.test(t.trim())}
 function isAdd(t){return /\b(dodaj|dodajte|dodam|vzamem|vzemi|izberem|izberi)\b/i.test(t)}
 function isInstall(t){return /(montaž|namestit|zmontir|montirat)/i.test(t)}
 
+
+function normalizeLocation(s){
+  const map={
+    "cellje":"Celje","celje":"Celje","celju":"Celje","celja":"Celje",
+    "ljublana":"Ljubljana","ljubljani":"Ljubljana","ljubljane":"Ljubljana",
+    "maribor":"Maribor","mariboru":"Maribor","maribora":"Maribor",
+    "ptuj":"Ptuj","ptuju":"Ptuj","ptuja":"Ptuj",
+    "koper":"Koper","kopru":"Koper","kopra":"Koper",
+    "zagreb":"Zagreb","zagreb":"Zagreb","rijeka":"Rijeka","split":"Split"
+  };
+  const key=s.toLowerCase().trim();
+  return map[key]||s.trim().replace(/^(v|iz|na)\s+/i,"").replace(/\b\p{L}/gu,c=>c.toUpperCase());
+}
+function extractNaturalRequest(raw){
+  const t=raw.toLowerCase();
+  if(/\b(kopalnic|kopalnico|kopalnica)\b/i.test(t)){state.space="kopalnica";state.intent="svetilo";}
+  else if(/\b(dnevni|dnevno|dnevna)\b/i.test(t)){state.space="dnevna soba";state.intent="svetilo";}
+  else if(/\b(spalnic|spalnico|spalnica)\b/i.test(t)){state.space="spalnica";state.intent="svetilo";}
+
+  const area=t.match(/(\d+(?:[.,]\d+)?)\s*(?:m2|m²|kvadrat(?:nih|nih)?\s*metrov)/i);
+  if(area)state.area=parseFloat(area[1].replace(",","." ));
+
+  if(/\b(stropn|stropno|stropna)\b/i.test(t))state.mounting="stropno";
+  if(/\b(stensk|stensko|stenska)\b/i.test(t))state.mounting="stensko";
+
+  const budget=t.match(/(?:do|max(?:imalno)?|največ|budget(?:\s*je)?)\s*(\d+(?:[.,]\d+)?)\s*(?:€|eur|evr)/i);
+  if(budget)state.budget=parseFloat(budget[1].replace(",","." ));
+
+  if(isInstall(t))state.service="montaža svetila";
+
+  const locPatterns=[
+    /\b(?:v|iz|pri)\s+(celje|cellje|ljubljana|maribor|ptuj|koper|zagreb|rijeka|split)\b/i,
+    /\b(celje|cellje|ljubljana|maribor|ptuj|koper|zagreb|rijeka|split)\b/i
+  ];
+  for(const r of locPatterns){const m=t.match(r);if(m){state.location=normalizeLocation(m[1]);break;}}
+
+  if(state.service)state.intent="električar";
+  return state;
+}
 function reply(raw){
   const t=raw.toLowerCase().trim();setFacts(t);
+  extractNaturalRequest(raw);
+
+  /* V5: if the user supplied several requirements in one sentence, skip questions already answered. */
+  if(state.intent==="svetilo" && (state.space||state.mounting||state.area||state.budget||state.service||state.location)){
+    if(state.budget && state.mounting){
+      state.step="offer";
+      recommendations();
+      let extra=state.service?`<br>Dodana je tudi zahteva za <b>${state.service}</b>.`:"";
+      return `Razumem: <b>${state.space||"prostor"}</b>${state.area?" • "+state.area+" m²":""}, <b>${state.mounting}</b>, proračun do <b>${eur(state.budget)}</b>.${state.location?` Lokacija: <b>${state.location}</b>.`:""}${extra}<br><br>Predlagam naslednje izdelke. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;
+    }
+    if(state.space==="kopalnica" && !state.mounting){
+      state.step="mounting";
+      return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`;
+    }
+    if(state.mounting && !state.budget){
+      state.step="budget";
+      return `Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je vaš približen proračun?`;
+    }
+  }
 
   /* Location has priority once the bot is waiting for a service location. */
   if(state.step==="service"){
@@ -181,7 +239,7 @@ function reply(raw){
     if(!state.location){
       const loc=t.replace(/^(v|iz)\s+/i,"").trim();
       if(loc){
-        state.location=loc.charAt(0).toUpperCase()+loc.slice(1);
+        state.location=normalizeLocation(loc);
         state.step="lead";
         const p=getSelectedProduct();
         return `Super, zabeležil sem lokacijo <b>${state.location}</b>.${p&&cart.length?` V košarici je <b>${p.name}</b> za ${eur(p.price)}.`:""}<br><br>Želite, da pripravimo <b>testno povpraševanje za montažo</b>?`;
