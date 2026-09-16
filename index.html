@@ -136,64 +136,88 @@ function ensureSelectedInCart(){
  if(!cart.some(x=>x.id===p.id)) addToCart(p.id);
  return p;
 }
+function recommendedProducts(){
+  return PRODUCTS.filter(p=>p.category==="Svetila" && !(state.space==="kopalnica"&&p.tags.includes("zunanja")) && (!state.budget||p.price<=state.budget));
+}
+function getSelectedProduct(){
+  if(lastSelectedProductId){const p=PRODUCTS.find(x=>x.id===lastSelectedProductId);if(p)return p;}
+  return recommendedProducts()[0]||null;
+}
+function addRememberedProduct(){
+  const p=getSelectedProduct(); if(!p)return null;
+  lastSelectedProductId=p.id;
+  if(!cart.some(x=>x.id===p.id))cart.push(p);
+  $("cartCount").textContent=cart.length; updateState(); return p;
+}
+function isYes(t){return /^(ja|da|lahko|seveda|ok|okej|potrjujem|potrdi)$/i.test(t.trim())}
+function isNo(t){return /^(ne|ne hvala|ne potrebujem)$/i.test(t.trim())}
+function isAdd(t){return /\b(dodaj|dodajte|dodam|vzamem|vzemi|izberem|izberi)\b/i.test(t)}
+function isInstall(t){return /(montaž|namestit|zmontir|montirat)/i.test(t)}
+
 function reply(raw){
- let t=raw.toLowerCase().trim(); setFacts(t);
- let d=detectIntent(t); if(d && d!=="električar") state.intent=d;
+ const t=raw.toLowerCase().trim(); setFacts(t);
 
- // Compound command: "dodajte jo + montaža" must add the remembered product immediately.
- const wantsInstall=/(montaž|namestit|zmontir)/i.test(t);
- const refersToLast=/(dodaj|dodajte|vzem|vzamem|izberem|izbral|jo|ga|to|prvo|prvi|1)/i.test(t);
- if(wantsInstall && refersToLast){
-   const p=ensureSelectedInCart();
-   if(p){
+ /* Recommendation state: first/second and natural add commands. */
+ if(state.step==="offer"){
+   const ps=recommendedProducts();
+   if(/^(prvo|prvi|1)$/i.test(t) && ps[0]){
+     lastSelectedProductId=ps[0].id; addRememberedProduct(); state.step="installation";
+     return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+   }
+   if(/^(drugo|drugi|2)$/i.test(t) && ps[1]){
+     lastSelectedProductId=ps[1].id; addRememberedProduct(); state.step="installation";
+     return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+   }
+   if(isAdd(t)||isYes(t)){
+     const p=addRememberedProduct();
+     if(p){state.step="installation";return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;}
+   }
+ }
+
+ /* Installation state. */
+ if(state.step==="installation"){
+   if(isInstall(t)||isYes(t)){
      state.service="montaža svetila"; state.intent="električar"; state.step="service";
-     updateState();
-     if(!state.location) return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
-     return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je v košarici. Za montažo v <b>${state.location}</b> lahko pripravimo testno povpraševanje.`;
+     return "Seveda. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?";
+   }
+   if(isNo(t)){state.step="cart";return "Seveda. Izdelek ostane v košarici.";}
+ }
+
+ /* Compound command must do both: add remembered product + installation. */
+ if(isInstall(t) && (isAdd(t)||/\b(jo|ga|to)\b/i.test(t))){
+   const p=addRememberedProduct();
+   if(p){
+     state.service="montaža svetila";state.intent="električar";state.step="service";
+     return `Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?`;
    }
  }
 
- if(/^(stropno|stropna|stropen)$/i.test(t)){state.mounting="stropno";state.step="budget"}
- if(/^(stensko|stenska)$/i.test(t)){state.mounting="stensko";state.step="budget"}
+ let d=detectIntent(t); if(d)state.intent=d;
 
- if(/^(prvo|prvi|1)$/i.test(t)){
-   const ps=PRODUCTS.filter(p=>p.category==="Svetila"&&!(state.space==="kopalnica"&&p.tags.includes("zunanja"))&&(!state.budget||p.price<=state.budget));
-   if(ps[0]){
-     lastSelectedProductId=ps[0].id; state.step="offer";
-     return `Izbrali ste <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b>. Ali želite, da ga dodam v košarico? Če želite, lahko uredimo tudi <b>montažo</b>.`;
-   }
+ if(/^(stropno|stropna|stropen)$/i.test(t)){
+   state.mounting="stropno";state.step="budget";
+   return `Odlično, iščemo <b>stropno svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
  }
- if(/^(drugo|drugi|2)$/i.test(t)){
-   const ps=PRODUCTS.filter(p=>p.category==="Svetila"&&!(state.space==="kopalnica"&&p.tags.includes("zunanja"))&&(!state.budget||p.price<=state.budget));
-   if(ps[1]){
-     lastSelectedProductId=ps[1].id; state.step="offer";
-     return `Izbrali ste <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b>. Ali želite, da ga dodam v košarico?`;
-   }
+ if(/^(stensko|stenska)$/i.test(t)){
+   state.mounting="stensko";state.step="budget";
+   return `Odlično, iščemo <b>stensko svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;
  }
- if(/^(ja|da|lahko|seveda)$/i.test(t) && state.step==="offer"){
-   const p=ensureSelectedInCart(); state.step="installation";
-   return p?`Odlično — <b>${p.name}</b> (${eur(p.price)}) je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`:"Izbira ni več na voljo.";
- }
- if(wantsInstall && !refersToLast){
-   state.service="montaža svetila";state.intent="električar";state.step="service";
-   if(!state.location)return "Seveda. Za montažo potrebujemo še <b>kraj izvedbe</b>. V katerem kraju želite montažo?";
- }
+
  if(state.intent==="svetilo"){
-   if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`}
-   if(state.mounting&&!state.budget){state.step="budget";return `Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`}
-   if(state.budget){state.step="offer";recommendations();return `Glede na vaše zahteve sem izbor omejil na izdelke do <b>${eur(state.budget)}</b>. Poglejte predloge spodaj. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`}
-   return "Za izbiro svetila potrebujem prostor, približno površino in mesto namestitve.";
+   if(state.space==="kopalnica"&&!state.mounting){state.step="mounting";return `Razumem — <b>kopalnica${state.area?" • "+state.area+" m²":""}</b>. Ali želite <b>stropno ali stensko svetilo</b>?`;}
+   if(state.mounting&&!state.budget){state.step="budget";return `Odlično, iščemo <b>${state.mounting} svetilo</b>${state.area?" za "+state.area+" m²":""}. Kakšen je približen proračun? Na primer <b>do 30 €, do 50 € ali več</b>.`;}
+   if(state.budget){state.step="offer";recommendations();return `Glede na vaše zahteve sem izbor omejil na izdelke do <b>${eur(state.budget)}</b>. Poglejte predloge spodaj. Napišete lahko <b>»prvo«</b> ali <b>»drugo«</b>.`;}
  }
  if(state.intent==="električar"){
    state.step="service";
    if(!state.location)return "Razumem. Potrebujete električarja. V katerem <b>kraju</b> je storitev?";
-   return `Zabeležil sem <b>${state.location}</b>. Opišite še, kaj je treba narediti, da pripravimo testno povpraševanje.`;
  }
  if(state.intent==="napaka")return "Pri električni napaki je varnost na prvem mestu. Opišite, <b>kaj ne deluje in kje</b>, nato lahko pripravimo povpraševanje za električarja.";
- if(state.intent==="vtičnice/stikala"){recommendations();return "Koliko vtičnic ali stikal potrebujete in ali gre za <b>menjavo ali novo montažo</b>?";}
- if(state.intent==="prenova"){recommendations();return "Za začetni seznam potrebujem približno <b>površino, število prostorov</b> in informacijo, ali gre za novo ali delno napeljavo.";}
+ if(state.intent==="vtičnice/stikala")return "Koliko vtičnic ali stikal potrebujete in ali gre za <b>menjavo ali novo montažo</b>?";
+ if(state.intent==="prenova")return "Za začetni seznam potrebujem približno <b>površino, število prostorov</b> in informacijo, ali gre za novo ali delno napeljavo.";
  return "Razumem. Povejte mi, ali potrebujete <b>material, električarja ali oboje</b>.";
 }
+
 $("chatForm").addEventListener("submit",e=>{e.preventDefault();let i=$("chatInput"),t=i.value.trim();if(!t)return;addMessage(t,"user");i.value="";setTimeout(()=>{addMessage(reply(t),"bot");updateState()},180)});
 function render(filter=""){let q=filter.toLowerCase(),ps=PRODUCTS.filter(p=>(p.name+" "+p.category+" "+p.desc+" "+p.tags.join(" ")).toLowerCase().includes(q));$("productGrid").innerHTML=ps.map(p=>`<article><div class="pic">${p.icon}</div><small>${p.category}</small><h3>${p.name}</h3><p>${p.desc}</p><b class="price">${eur(p.price)}</b><button onclick="addToCart(${p.id})">Dodaj v košarico</button></article>`).join("")}
 function addToCart(id){let p=PRODUCTS.find(x=>x.id===id);if(!p)return;lastSelectedProductId=id;if(!cart.some(x=>x.id===id))cart.push(p);$("cartCount").textContent=cart.length;updateState();toast(p.name+" je dodan v košarico.")}
