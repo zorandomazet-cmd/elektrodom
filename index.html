@@ -218,7 +218,7 @@ function reply(raw){
 
   /* V5: if the user supplied several requirements in one sentence, skip questions already answered. */
   if(state.intent==="svetilo" && (state.space||state.mounting||state.area||state.budget||state.service||state.location)){
-    if(state.budget && state.mounting){
+    if(state.budget && state.mounting && state.step!=="offer"){
       state.step="offer";
       recommendations();
       let extra=state.service?`<br>Dodana je tudi zahteva za <b>${state.service}</b>.`:"";
@@ -255,24 +255,34 @@ function reply(raw){
     if(isNo(t)){state.step="completed";return "V redu. Povpraševanja ne bom oddal.";}
   }
 
-  /* Product recommendation state. */
+  /* Product recommendation state: handle choice BEFORE any fallback logic. */
   if(state.step==="offer"){
     const ps=recommendedProducts();
-    if(/^(prvo|prvi|1)$/i.test(t)&&ps[0]){
-      lastSelectedProductId=ps[0].id;addRememberedProduct();
-      if(state.service && state.location){state.step="lead";return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>. Želite, da pripravimo <b>testno povpraševanje</b>?`;}
+    let chosen=null;
+    if(/^(prvo|prvi|1)$/i.test(t)) chosen=ps[0]||null;
+    else if(/^(drugo|drugi|2)$/i.test(t)) chosen=ps[1]||null;
+
+    if(chosen){
+      lastSelectedProductId=chosen.id;
+      addRememberedProduct();
+      if(state.service && state.location){
+        state.step="lead";
+        return `Odlično — <b>${chosen.name}</b> za <b>${eur(chosen.price)}</b> je dodan v košarico.<br><br>Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>.<br><br>Želite, da pripravimo <b>testno povpraševanje</b>?`;
+      }
       state.step="installation";
-      return `Odlično — <b>${ps[0].name}</b> za <b>${eur(ps[0].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+      return `Odlično — <b>${chosen.name}</b> za <b>${eur(chosen.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
     }
-    if(/^(drugo|drugi|2)$/i.test(t)&&ps[1]){
-      lastSelectedProductId=ps[1].id;addRememberedProduct();
-      if(state.service && state.location){state.step="lead";return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>. Želite, da pripravimo <b>testno povpraševanje</b>?`;}
-      state.step="installation";
-      return `Odlično — <b>${ps[1].name}</b> za <b>${eur(ps[1].price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
-    }
+
     if(isAdd(t)||isYes(t)){
       const p=addRememberedProduct();
-      if(p){state.step="installation";return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;}
+      if(p){
+        if(state.service && state.location){
+          state.step="lead";
+          return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico.<br><br>Zabeležil sem tudi <b>${state.service}</b> v kraju <b>${state.location}</b>.<br><br>Želite, da pripravimo <b>testno povpraševanje</b>?`;
+        }
+        state.step="installation";
+        return `Odlično — <b>${p.name}</b> za <b>${eur(p.price)}</b> je dodan v košarico. Ali želite tudi <b>montažo svetila</b>?`;
+      }
     }
   }
 
