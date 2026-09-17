@@ -1,21 +1,13 @@
-ElektroDom V5.1
-Popravek kombiniranega naravnega jezika.
+ElektroDom V5.3
+Deterministic priority fix for recommendation choices.
 
-Test:
+Critical test:
 "Rabim luč za kopalnico 8 m², stropno, do 50 €, pa montažo v Celju."
-
-Expected:
-- kopalnica
-- 8 m²
-- stropno
-- budget 50 €
-- montaža
-- Celje
-- priporočila brez ponovnega vprašanja po kraju
-
-Then:
+then:
 "prvo"
+
 Expected:
-- LED plafonjera 24 W added to cart
-- installation and Celje retained
-- asks for confirmation of test inquiry, not installation again
+LED plafonjera 24 W is added to cart.
+Installation and Celje are retained.
+The bot asks for test inquiry confirmation.
+It must NOT repeat the recommendation list.
