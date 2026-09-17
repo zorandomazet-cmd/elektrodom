@@ -1,13 +1,21 @@
-ElektroDom V5.3
-Deterministic priority fix for recommendation choices.
+# ElektroDom V7
 
-Critical test:
-"Rabim luč za kopalnico 8 m², stropno, do 50 €, pa montažo v Celju."
-then:
-"prvo"
+Modernizirana produkcijska osnova za spletno trgovino z elektro materialom in električarskimi storitvami.
 
-Expected:
-LED plafonjera 24 W is added to cart.
-Installation and Celje are retained.
-The bot asks for test inquiry confirmation.
-It must NOT repeat the recommendation list.
+## Kaj je vključeno
+- sodobna responsive spletna stran z več vsebinskimi podstranmi/sekcijami: trgovina, storitve, vodniki, AI pomočnik, povpraševanje, kontakt;
+- produktni katalog in filtriranje;
+- košarica;
+- AI-style svetovalni pogovor z razumevanjem naravnega jezika;
+- kombinacija material + storitev + lokacija;
+- priporočanje svetil glede na prostor/površino/proračun;
+- prepoznavanje lokacij in pogostih tipkarskih napak;
+- lead flow;
+- varnostna meja pri 230 V, varovalkah in FID/RCD;
+- ločen `chat-engine.js`, ki ga je mogoče kasneje zamenjati z dejanskim LLM/backendom.
+
+## Namestitev
+Za statični deployment naložite vse tri datoteke (`index.html`, `styles.css`, `app.js`, `chat-engine.js`) v isti direktorij.
+
+## Pomembno za produkcijo
+To je produkcijska **frontend osnova**, ne še dejanska produkcijska e-trgovina. Pred javno uporabo je treba dodati backend/API, realni katalog in zalogo, plačila, avtorizacijo, GDPR/cookie mehanizem, strežniško validacijo, CRM, logging, rate limiting in pravo LLM integracijo.
