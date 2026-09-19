@@ -97,6 +97,7 @@ export function handleMessage(text,s) {
   extract(text,s);
   if(s.safety && !s.intent){s.questionCount++;return{type:'safety',text:'To lahko pomeni električno varnostno tveganje. Prenehajte uporabljati napravo oziroma tokokrog, če je to mogoče varno, in naj stanje preveri električar. Če je prisoten dim ali požar, pokličite pristojne službe.',state:s};}
   if(s.safety && s.safetyReason && /dim|iskrenje|vonj po zažganem|pregrevanje/.test(s.safetyReason)){return{type:'safety',text:`Opazili ste ${s.safetyReason}. Za zdaj ne uporabljajte naprave oziroma tokokroga in ne odpirajte električne instalacije. Priporočam pregled električarja.`,state:s};}
+  if(s.intent==='zaščita' && !s.productRequested && /fid|rcd/.test(t)){return{type:'answer',text:'FID oziroma RCD je zaščitna naprava, ki zazna diferenčni tok in v ustreznih pogojih odklopi tokokrog. Oznaka 30 mA se nanaša na nazivni diferenčni tok. Pravilnega tipa, vezave in izvedbe za konkreten objekt ni varno določiti brez podatkov o sistemu in tokokrogu; posege v razdelilnik naj opravi usposobljen električar.',state:s};}
   if(s.service && !s.productRequested && !s.location){s.questionCount++;return{type:'question',text:'V katerem kraju potrebujete električarja oziroma montažo?',state:s};}
   if(s.intent==='svetilo'&&s.productRequested){
     if(!s.space){s.questionCount++;return{type:'question',text:'V katerem prostoru bo svetilo?',state:s};}

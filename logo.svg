@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#ffd23f"/><stop offset="1" stop-color="#ffae00"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="16" fill="#0b2037" stroke="#ffd23f" stroke-width="2"/><path d="M32 11 17 24v25h30V24z" fill="none" stroke="url(#g)" stroke-width="4"/><path d="m35 20-10 14h8l-5 11 12-17h-8z" fill="#ffd23f"/><text x="73" y="39" font-family="Inter,Arial,sans-serif" font-size="31" font-weight="800" fill="#fff">Elektro<tspan fill="#ffd23f">Dom</tspan></text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 88" role="img" aria-labelledby="t d">
+<title id="t">ElektroDom</title><desc id="d">ElektroDom logo</desc>
+<g transform="translate(4 6)"><path d="M40 2 6 29v45h68V29L40 2Z" fill="none" stroke="#FFD33D" stroke-width="7" stroke-linejoin="round"/><path d="M43 16 27 43h12l-4 22 18-29H42l1-20Z" fill="#FFD33D"/><path d="M16 73V51h48v22" fill="none" stroke="#FFD33D" stroke-width="5"/></g>
+<text x="92" y="49" font-family="Arial,Helvetica,sans-serif" font-size="35" font-weight="800" fill="#fff">Elektro<tspan fill="#FFD33D">Dom</tspan></text>
+<text x="94" y="70" font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="500" fill="#AFC1D0">Pametna energija za vaš dom</text>
+</svg>
